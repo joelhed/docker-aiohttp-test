@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS question;
+DROP TABLE IF EXISTS choice;
