@@ -83,6 +83,17 @@ async def get_question_with_choices(conn, question_id):
     return question
 
 
+async def get_vote_count(conn, question_id):
+    """Get the total amount of votes on a given question."""
+    # This is not actually used currently, since it's faster, i.e. saves io, to do it in the
+    # application code rather than in the database. -- 2021-06-09
+    async with conn.cursor() as cur:
+        await cur.execute("SELECT SUM(votes) FROM choice WHERE question_id=?;", (question_id, ))
+        vote_count, = await cur.fetchone()
+
+    return vote_count
+
+
 async def get_choice(conn, question_id, choice_id):
     """Get a choice by question and choice id."""
     conn.row_factory = Row

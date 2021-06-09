@@ -60,6 +60,9 @@ async def get_poll(request):
         if poll is None:
             raise web.HTTPNotFound()
 
+    vote_count = sum(choice["votes"] for choice in poll["choices"])
+    poll["vote_count"] = vote_count
+
     return web.json_response(poll)
 
 
