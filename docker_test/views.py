@@ -1,15 +1,15 @@
 from aiohttp import web
 import json
-from sqlite3 import Row
 
 from .db import create_connection
+from . import data_access
 
 
 async def index(request):
     """Get the status of the application."""
     async with create_connection(request.app) as conn:
-        cur = await conn.execute("SELECT COUNT(*) FROM question;")
-        question_count, = await cur.fetchone()
+        question_count = await data_access.get_question_count(conn)
+
     return web.json_response({
         "status": "online",
         "question_count": question_count,
@@ -21,10 +21,10 @@ async def index(request):
 async def get_polls(request):
     """Get all polls."""
     async with create_connection(request.app) as conn:
-        conn.row_factory = Row
-        cur = await conn.execute("SELECT * FROM question;")
-        data = await cur.fetchall()
-    return web.json_response([dict(row) for row in data])
+        polls = await data_access.get_all_questions(conn)
+
+    return web.json_response(polls)
+
 
 async def post_polls(request):
     """Create a new poll.
@@ -46,37 +46,19 @@ async def post_polls(request):
         raise web.HTTPBadRequest()
 
     async with create_connection(request.app) as conn:
-        #conn.row_factory = Row
-        cur = await conn.execute(
-            "INSERT INTO question (question_text) VALUES (?);",
-            (question_text, )
-        )
-        question_id = cur.lastrowid
+        question_id = await data_access.create_question(conn, question_text, choices)
 
-        await cur.executemany(
-            "INSERT INTO choice (choice_text, question_id) VALUES (?, ?);",
-            [(choice_text, question_id) for choice_text in choices],
-        )
-        await conn.commit()
     return web.json_response({"question_id": question_id})
 
 
 async def get_poll(request):
     """Get info about a particular poll."""
     poll_id = int(request.match_info["poll_id"])
+
     async with create_connection(request.app) as conn:
-        conn.row_factory = Row
-
-        cur = await conn.execute("SELECT * FROM question WHERE id=?", (poll_id, ))
-        res = await cur.fetchone()
-        if res is None:
+        poll = await data_access.get_question_with_choices(conn, poll_id)
+        if poll is None:
             raise web.HTTPNotFound()
-
-        poll = dict(res)
-
-        await cur.execute("SELECT id, choice_text, votes FROM choice WHERE question_id=?", (poll_id, ))
-        res = await cur.fetchall()
-        poll["choices"] = [dict(choice) for choice in res]
 
     return web.json_response(poll)
 
@@ -105,22 +87,12 @@ async def put_poll_choice(request):
 
     if vote:
         async with create_connection(request.app) as conn:
-            conn.row_factory = Row
-            await conn.execute(
-                "UPDATE choice SET votes = votes + 1 WHERE question_id=? AND id=?;",
-                (poll_id, choice_id),
-            )
-            await conn.commit()
+            await data_access.vote_on_choice(conn, poll_id, choice_id)
 
-            cur = await conn.execute(
-                "SELECT * FROM choice WHERE question_id=? AND id=?;",
-                (poll_id, choice_id),
-            )
-            res = await cur.fetchone()
-            if res is None:
+            choice = await data_access.get_choice(conn, poll_id, choice_id)
+            if choice is None:
                 raise web.HTTPNotFound()
 
-        choice = dict(res)
         return web.json_response(choice)
 
     return web.json_response({"resource": "put_poll_choice"})
