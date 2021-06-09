@@ -31,7 +31,27 @@ async def get_polls(request):
 
 # post new
 async def post_polls(request):
-    return web.json_response({"resource": "post_polls"})
+    try:
+        data = await request.json()
+        question_text = str(data["question_text"])
+        choices = [str(choice) for choice in data["choices"]]
+    except (KeyError, json.decoder.JSONDecodeError):
+        raise web.HTTPBadRequest()
+
+    async with create_connection(request.app) as conn:
+        #conn.row_factory = Row
+        cur = await conn.execute(
+            "INSERT INTO question (question_text) VALUES (?);",
+            (question_text, )
+        )
+        question_id = cur.lastrowid
+
+        await cur.executemany(
+            "INSERT INTO choice (choice_text, question_id) VALUES (?, ?);",
+            [(choice_text, question_id) for choice_text in choices],
+        )
+        await conn.commit()
+        return web.json_response({"question_id": question_id})
 
 # get one
 # /polls/{id}
