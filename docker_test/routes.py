@@ -9,5 +9,6 @@ def setup_routes(app):
         web.post("/polls", views.post_polls),
         web.get(r"/polls/{poll_id:\d+}", views.get_poll),
         web.post(r"/polls/{poll_id:\d+}/choices", views.post_poll_choices),
+        web.get(r"/polls/{poll_id:\d+}/choices/{choice_id:\d+}", views.get_poll_choice),
         web.put(r"/polls/{poll_id:\d+}/choices/{choice_id:\d+}", views.put_poll_choice),
     ])

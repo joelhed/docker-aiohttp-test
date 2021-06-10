@@ -40,9 +40,16 @@ async def post_polls(request):
     """
     try:
         data = await request.json()
-        question_text = str(data["question_text"])
-        choices = [str(choice) for choice in data["choices"]]
+        question_text = str(data["question_text"]).strip()
+        unfiltered_choices = [str(choice).strip() for choice in data["choices"]]
     except (KeyError, json.decoder.JSONDecodeError):
+        raise web.HTTPBadRequest()
+
+    if question_text == "":
+        raise web.HTTPBadRequest()
+
+    choices = [choice for choice in unfiltered_choices if choice != ""]
+    if len(choices) == 0:
         raise web.HTTPBadRequest()
 
     async with create_connection(request.app) as conn:
@@ -72,6 +79,19 @@ async def post_poll_choices(request):
     return web.json_response({"resource": "post_poll_choices"})
 
 
+async def get_poll_choice(request):
+    """Get a choice of a poll."""
+    poll_id = int(request.match_info["poll_id"])
+    choice_id = int(request.match_info["choice_id"])
+
+    async with create_connection(request.app) as conn:
+        choice = await data_access.get_choice(conn, poll_id, choice_id)
+        if choice is None:
+            raise web.HTTPNotFound()
+
+    return web.json_response(choice)
+
+
 async def put_poll_choice(request):
     """Vote on a poll choice.
 
@@ -82,20 +102,22 @@ async def put_poll_choice(request):
     """
     poll_id = int(request.match_info["poll_id"])
     choice_id = int(request.match_info["choice_id"])
+
     try:
         data = await request.json()
-        vote = bool(data["vote"])
-    except (KeyError, TypeError, json.decoder.JSONDecodeError):
+    except json.decoder.JSONDecodeError:
         raise web.HTTPBadRequest()
 
-    if vote:
-        async with create_connection(request.app) as conn:
+    vote = data.get("vote", False)
+    if not isinstance(vote, bool):
+        raise web.HTTPBadRequest()
+
+    async with create_connection(request.app) as conn:
+        if vote:
             await data_access.vote_on_choice(conn, poll_id, choice_id)
 
-            choice = await data_access.get_choice(conn, poll_id, choice_id)
-            if choice is None:
-                raise web.HTTPNotFound()
+        choice = await data_access.get_choice(conn, poll_id, choice_id)
+        if choice is None:
+            raise web.HTTPNotFound()
 
-        return web.json_response(choice)
-
-    return web.json_response({"resource": "put_poll_choice"})
+    return web.json_response(choice)
