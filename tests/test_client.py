@@ -52,6 +52,8 @@ async def test_get_poll(client):
     assert choice["votes"] == 0
 
 
+# Create new poll
+
 async def test_post_polls(client):
     new_poll = {
         "question_text": "A test question",
@@ -83,6 +85,104 @@ async def test_post_polls(client):
     assert choice["votes"] == 0
 
 
+async def test_post_polls_without_question_text(client):
+    new_poll = {
+        #"question_text": "A test question",
+        "choices": [
+            "Choice 1",
+            "Choice 2",
+        ],
+    }
+    resp = await client.post('/polls', json=new_poll)
+    assert resp.status == 400
+
+
+async def test_post_polls_with_empty_question_text(client):
+    new_poll = {
+        "question_text": " ",
+        "choices": [
+            "Choice 1",
+            "Choice 2",
+        ],
+    }
+    resp = await client.post('/polls', json=new_poll)
+    assert resp.status == 400
+
+
+async def test_post_polls_without_choices(client):
+    new_poll = {
+        "question_text": "A test question",
+        #"choices": [
+        #    "Choice 1",
+        #    "Choice 2",
+        #],
+    }
+    resp = await client.post('/polls', json=new_poll)
+    assert resp.status == 400
+
+
+async def test_post_polls_with_empty_choices_list(client):
+    new_poll = {
+        "question_text": "A test question",
+        "choices": [
+            #"Choice 1",
+            #"Choice 2",
+        ],
+    }
+    resp = await client.post('/polls', json=new_poll)
+    assert resp.status == 400
+
+
+async def test_post_polls_with_only_empty_choices(client):
+    new_poll = {
+        "question_text": "A test question",
+        "choices": [
+            "",
+            "",
+        ],
+    }
+    resp = await client.post('/polls', json=new_poll)
+    assert resp.status == 400
+
+
+async def test_post_polls_with_some_empty_choices(client):
+    new_poll = {
+        "question_text": "A test question",
+        "choices": [
+            "Choice 1",
+            "Choice 2",
+            " ",
+            "",
+        ],
+    }
+    resp = await client.post('/polls', json=new_poll)
+    assert resp.status == 200
+
+    poll_id = (await resp.json())["question_id"]
+
+    resp = await client.get(f'/polls/{poll_id}')
+    assert resp.status == 200
+
+    poll = await resp.json()
+    assert poll["question_text"] == "A test question"
+
+    choices = [choice["choice_text"] for choice in poll["choices"]]
+    assert choices == ["Choice 1", "Choice 2"]
+
+
+# Choice
+
+async def test_get_choice(client):
+    resp = await client.get('/polls/1/choices/2')
+    assert resp.status == 200
+
+    choice = await resp.json()
+    assert choice["id"] == 2
+    assert choice["question_id"] == 1
+    assert choice["choice_text"] == "The sky"
+    assert choice["votes"] == 0
+
+
 async def test_vote_on_choice(client):
     body = {
         "vote": True
@@ -110,3 +210,33 @@ async def test_vote_on_choice(client):
     assert choice is not None
     assert choice["choice_text"] == "The sky"
     assert choice["votes"] == 1
+
+
+async def test_put_choice_without_content(client):
+    body = {
+        #"vote": True
+    }
+    resp = await client.put('/polls/1/choices/2', json=body)
+    assert resp.status == 200
+
+    choice = await resp.json()
+    choice["votes"] == 0
+
+
+async def test_put_choice_where_vote_is_false(client):
+    body = {
+        "vote": False
+    }
+    resp = await client.put('/polls/1/choices/2', json=body)
+    assert resp.status == 200
+
+    choice = await resp.json()
+    choice["votes"] == 0
+
+
+async def test_put_choice_where_vote_isnt_bool(client):
+    body = {
+        "vote": "Something weird"
+    }
+    resp = await client.put('/polls/1/choices/2', json=body)
+    assert resp.status == 400
