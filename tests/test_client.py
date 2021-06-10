@@ -1,11 +1,12 @@
 import pytest
-from docker_test.main import app
+from docker_test.main import make_app
 import init_db
 
 
 @pytest.fixture
 async def client(aiohttp_client, loop):
     init_db.init_db_with_sample_data()
+    app = make_app()
     client = await aiohttp_client(app)
     return client
 

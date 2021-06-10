@@ -6,10 +6,13 @@ from .routes import setup_routes
 from .settings import config
 
 
-app = web.Application()
-setup_routes(app)
-app["config"] = config
+def make_app():
+    app = web.Application()
+    setup_routes(app)
+    app["config"] = config
+    return app
 
 
 if __name__ == "__main__":
+    app = make_app()
     web.run_app(app)
