@@ -9,4 +9,7 @@ from .settings import config
 app = web.Application()
 setup_routes(app)
 app["config"] = config
-web.run_app(app)
+
+
+if __name__ == "__main__":
+    web.run_app(app)
